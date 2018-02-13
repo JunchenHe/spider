@@ -1,0 +1,363 @@
+##2-10########################################
+#文件读写
+
+
+f=open(r'./shiyan.txt','r')
+f.read()#将所有数据一次读入
+f.close()
+    ---->
+        with open(r'./shiyan.txt','r') as fileReader:
+            print fileReader.read()
+
+read(size)//设置缓冲
+
+with open(r'./shiyan.txt','r') as fileReader:
+    for line in fileReader.readlines():
+        print line.strip()
+
+
+ ---------------------
+
+f=open(r'./shiyan.txt','w')
+f.write('qiye') #f.flush()//刷新缓冲区
+f.close()
+   
+with open(r'./shiyan.txt','w') as fileWriter:
+    fileWriter.write('qiye')
+
+
+-------------------
+
+操作文件和目录:
+import os
+
+######################################################
+#序列化:
+#把内存中的变量变成可存储或可传输的内容写入磁盘
+
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle 
+
+d=dict(url='index.html',title='首页',content='首页')
+pickle.dumps(d)
+
+f=open(r'./dump.txt','wb')
+pickle.dump(d,f)
+f.close()
+
+---
+
+f=open(r'./dump.txt','rb')
+d=dickle.load(f)
+f.close()
+print(d)
+
+
+##############################################
+#进程和线程
+
+os模块的fork，仅适用Unix/Linux
+multiprocessing模块，跨平台
+
+----
+#fork()
+import os
+if __name__ == '__main__':
+    print 'current Process (%s) start ...'%(os.getpid())
+    pid=os.fork()
+    if pid<0:
+        print 'error in fork'
+    elif pid==0:
+        print 'I am chile process (%s) and my parent process is (%s)'%(os.getpid(),os.getppid())
+    else:
+        print 'I (%s) create a chile process (%s)'%(os.getpid(),pid)
+
+-----------------
+#multiprocessing
+import os
+from multiprocessing import Process
+def run_proc(name):
+    print 'Child process %s (%s) Running...'%(name,os.getpid())
+    
+if __name__ == '__main__':
+    print 'Parent process %s.'%os.getpid()
+    for i in range(5):
+        p=Process(target=run_proc,args=(str(i),))
+        print 'Process will start.'
+        p.start()
+    p.join()
+    print 'Process end.'
+
+------------------------------------
+#Pool
+
+from multiprocessing import Pool
+import os,time,random
+
+def run_task(name):
+    print 'Tack %s (pid=%s) is running ... '%(name,os.getpid())
+    time.sleep(random.random()*3)
+    print 'Tack %s end.'%name
+
+
+if __name__=='__main__':
+    print 'Current process %s .'%os.getpid()
+    p=Pool(processes=3) #默认为计算机cpu核数
+    for i in range(5):
+        p.apply_async(run_task,args=(i,))
+    print 'Waiting for all subprocesses done ...'
+    p.close()
+    p.join()
+    print 'All subprocesses done'
+
+
+############################################################
+#进程间通信
+#Queue、Pipe
+Queue-->多个进程
+Pipe-->两个进程
+
+
+---
+Queue-->多进程安全,Put(),Get()
+
+Put()-->
+blocked,timeout,
+if ( block==Ture && timeout>0 ) -->  阻塞timeout指定的时间,直到有剩余空间
+
+Get()-->
+blocked,timeout,
+if ( blocked == true && timeout>0 ) --> 直到在提么timeout指定的时间取到数据
+
+-----
+#Queue
+
+from multiprocessing import Process,Queue
+import os,time,random
+
+def proc_write(q,urls):
+    print ('Process (%s) is writing ...' % os.getpid())
+    for url in urls:
+        q.put(url)
+        print ('Put %s to queue' % url)
+        time.sleep(random.random())
+
+def proc_read(q):
+    print ('Process (%s) is reading ...' % os.getpid())
+    while True:
+        url=q.get(True)
+        print('Get %s from queue.' % url)
+
+if __name__=='__main__':
+    #parent proc create queue,and send to children
+    q=Queue()
+    proc_writer1=Process(target=proc_write,args=(q,['url_1','url_2','url_3']))
+    proc_writer2=Process(target=proc_write,args=(q,['url_4','url_5','url_6']))
+    proc_reader=Process(target=proc_read,args=(q,))
+    #start child proc_writer
+    proc_writer1.start()
+    proc_writer2.start()
+    #start chile proc_reader
+    proc_reader.start()
+    #wait proc_writer stop 
+    proc_writer1.join()
+    proc_writer2.join()
+    #proc_reader stop
+    proc_reader.terminate()
+
+
+---------
+#Pipe
+Pipe()返回(conn1 ,conn2)代表管道的两个端口
+
+
+import multiprocessing
+import random
+import time,os
+
+def proc_send(pipe,urls):
+    for url in urls:
+        print "Process (%s) send: %s"%(os.getpid(),url)
+        pipe.send(url)
+        time.sleep(random.random())
+
+def proc_recv(pipe):
+    while True:
+        print "Process (%s) rev:%s"%(os.getpid(),pipe.recv())
+        time.sleep(random.random())
+
+if __name__ == "__main__":
+    pipe=multiprocessing.Pipe()
+    p1=multiprocessing.Process(target=proc_send,args=(pipe[0],['url_'+str(i) for i in range(10) ]))
+    p2=multiprocessing.Process(target=proc_recv,args=(pipe[1],))
+    p1.start()
+    p2.start()
+    p1.join()
+    p2.join()
+
+-------------------
+#多线程
+#python -->thread和threading
+#threading是高级模块，对thread进行封装
+
+import random
+import time,threading
+
+def thread_run(urls):
+    print 'Current %s is running...' % threading.current_thread().name
+    for url in urls:
+        print '%s -->>> %s'%(threading.current_thread().name,url)
+        time.sleep(random.random())
+    print '%s ended.'% threading.current_thread().name
+
+print '%s is running ...'% threading.current_thread().name 
+t1=threading.Thread(target=thread_run,name='Thread_1',args=(['url_1','url_2','url_3'],))
+t2=threading.Thread(target=thread_run,name='Thread_2',args=(['url_4','url_5','url_6'],))
+t1.start()
+t2.start()
+t1.join() #待线程结束并返回才接下去执行
+t2.join() 
+print '%s ended.'% threading.current_thread().name
+
+------------------------
+
+#threading.Thread创建线程类
+
+import random
+import threading
+import time
+class myThread(threading.Thread):
+    def __init__(self,name,urls):
+        threading.Thread.__init__(self,name=name)
+        self.urls=urls
+
+    def run(self):
+        print 'Current %s is running ...'%threading.current_thread().name
+        for url in self.urls:
+            print '%s--->>> %s'%(threading.current_thread().name,url)
+            time.sleep(random.random())
+        print '%s ended.'%threading.current_thread().name
+
+print '%s is running...'% threading.current_thread().name
+t1=myThread(name='Thread_1',urls=['url_1','url_2','url_3'])
+t2=myThread(name='Thread_2',urls=['url_1','url_2','url_3'])
+t1.start()
+t2.start()
+t1.join()
+t2.join()
+print '%s ended.'% threading.current_thread().name
+
+
+-----------------------------
+
+#线程同步
+#Thread对象的Lock和RLock实现简单线程同步
+#acquire方法和release方法
+#Lock对象只允许一次acquire
+#RLock对象允许一个线程对其多次acquire
+
+import threading
+mylock=threading.RLock()
+num=0
+class myThread(threading.Thread):
+    def __init__(self,name):
+        threading.Thread.__init__(self,name=name)
+
+    def run(self):
+        global num
+        while True:
+            mylock.acquire()
+            print '%s locked,Number is: %d'%(threading.current_thread().name,num)
+            if num>=4:
+                mylock.release()
+                print '%s releaseed,Number: %d'%(threading.current_thread().name,num)
+                break #退出循环
+            num+=1
+            print '%s releaseed,Number: %d'%(threading.current_thread().name,num)
+            mylock.release()
+            
+if __name__=='__main__':
+    thread1=myThread('Thread_1')
+    thread2=myThread('Thread_2')
+    thread1.start()
+    thread2.start()
+
+-----------------------
+
+#全局解释器锁：
+#cpu密集型操作-->适合多进程
+#I/O密集型操作-->适合多线程
+
+-----------------------
+
+#协程
+#用户级轻量级线程，
+#需要自己编写调度逻辑,相当于单线程,
+#不是由cpu进行调度和切换上下文,相当于就一个"线程"干不同的事
+#python-->gevent库，基于协程的python网络函数库
+
+from gevent import monkey;monkey.patch_all()
+import gevent
+import urllib2
+
+def run_task(url):
+    print 'Visit -->> %s'%url
+    try:
+        response=urllib2.urlopen(url)
+        data=response.read()
+        print '%d bytes received from %s.'%(len(data),url)
+    except Exception.e:
+        print e
+
+if __name__=='__main__':
+    urls=['https://github.com/','https://www.python.org','http://www.baidu.com']
+    greenlets=[gevent.spawn(run_task,url) for url in urls]
+    gevent.joinall(greenlets)
+
+
+--------------------
+#monkey
+#pool
+#gevent
+
+
+
+from gevent import monkey
+monkey.patch_all()
+import urllib2
+from gevent.pool import Pool
+
+def run_task(url):
+    print 'Visit -->> %s'%url
+    try:
+        response=urllib2.urlopen(url)
+        data=response.read()
+        print '%d bytes received from %s.'%(len(data),url)
+    except Exception.e:
+        print e
+    return 'url:%s-->>>finish'%url
+
+if __name__=='__main__':
+    pool=Pool(2)
+    urls=['https://github.com','https://www.python.org/','https://www.baidu.com']
+    results=pool.map(run_task,urls)
+    print results
+
+
+
+---------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
